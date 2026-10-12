@@ -2,3 +2,7 @@
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
+
+# Secrets (MongoDB password, ENTSO-E token) stay local, on streamlit.io they go in the app settings
+.streamlit/secrets.toml
+.env
