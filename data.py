@@ -1,5 +1,10 @@
 import pandas as pd
+import pymongo
+import requests
 import streamlit as st
+
+# NVE Magasinstatistikk API, returns the full weekly history for all areas
+RESERVOIR_URL = "https://biapi.nve.no/magasinstatistikk/api/Magasinstatistikk/HentOffentligData"
 
 # Norwegian to English column names, same mapping as in the notebook
 COLUMN_RENAME = {
@@ -26,20 +31,56 @@ VALUE_COLUMNS = [
 ]
 
 
-@st.cache_data
-def load_data():
-    """Load weekly reservoir data for all of Norway, sorted by date.
+def month_options():
+    """All months from the first week in the API (Jan 1995) up to this month, as "YYYY-MM" strings.
 
-    Cached with st.cache_data so the CSV is only read once per session
-    instead of on every rerun. In part 2 this reads from MongoDB instead.
+    Used by the period slider, which has to exist before anything is downloaded.
     """
-    df = pd.read_csv("reservoirs.csv", parse_dates=["dato_Id"])
+    months = pd.period_range("1995-01", pd.Timestamp.today(), freq="M")
+    return [str(month) for month in months]
+
+
+@st.cache_data(ttl=3600)
+def load_reservoirs(start_month, end_month):
+    """Download weekly reservoir data from the NVE API and keep the months in the chosen period.
+
+    The API has no date parameters and always sends the whole history, so the
+    period is cut right after the download. The cache is per period, so moving
+    the slider to a new period gives a new download.
+    """
+    response = requests.get(RESERVOIR_URL, timeout=60)
+    response.raise_for_status()
+
+    df = pd.DataFrame(response.json())
     df = df.rename(columns=COLUMN_RENAME)
+    df["date"] = pd.to_datetime(df["date"])
 
-    # Keep only the rows for all of Norway, the raw file also has price areas and watercourse areas
-    df = df[df["area_type"] == "NO"]
+    # Keep only the weeks inside the chosen period
+    months = df["date"].dt.strftime("%Y-%m")
+    df = df[(months >= start_month) & (months <= end_month)]
 
-    # The raw rows are not sorted by date, so sort and use date as index
-    df = df.sort_values("date").set_index("date")
+    # The raw rows are not sorted by date
+    return df.sort_values("date")
 
-    return df[VALUE_COLUMNS]
+
+@st.cache_resource
+def init_connection():
+    """MongoDB client, created once and shared between reruns.
+
+    The URI is in .streamlit/secrets.toml locally and in the app settings on streamlit.io.
+    """
+    return pymongo.MongoClient(st.secrets["mongo"]["uri"])
+
+
+@st.cache_data(ttl=600)
+def load_flows():
+    """Daily cross-border flows (GWh) per connection and direction, prepared in the notebook with Spark."""
+    client = init_connection()
+    collection = client["ind320"]["flows_daily"]
+
+    # Leave out MongoDB's _id field, it is not needed in the app
+    items = list(collection.find({}, {"_id": 0}))
+
+    df = pd.DataFrame(items)
+    df["date"] = pd.to_datetime(df["date"])
+    return df
