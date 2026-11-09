@@ -2,6 +2,7 @@ import pandas as pd
 import pymongo
 import requests
 import streamlit as st
+from weather import download_era5
 
 # NVE Magasinstatistikk API, returns the full weekly history for all areas
 RESERVOIR_URL = "https://biapi.nve.no/magasinstatistikk/api/Magasinstatistikk/HentOffentligData"
@@ -30,6 +31,9 @@ VALUE_COLUMNS = [
     "fill_level_change",
 ]
 
+# Area numbers that have data for each area type (VASS 4 is in the API, but has no data)
+AREA_NUMBERS = {"EL": [1, 2, 3, 4, 5], "NO": [0], "VASS": [1, 2, 3]}
+
 
 def month_options():
     """All months from the first week in the API (Jan 1995) up to this month, as "YYYY-MM" strings.
@@ -40,13 +44,22 @@ def month_options():
     return [str(month) for month in months]
 
 
-@st.cache_data(ttl=3600)
-def load_reservoirs(start_month, end_month):
-    """Download weekly reservoir data from the NVE API and keep the months in the chosen period.
+def chosen_area():
+    """Area type and area number chosen in the sidebar. The number is 0 for NO and the first one if none is chosen."""
+    area_type = st.session_state["area_type"]
+    numbers = AREA_NUMBERS[area_type]
+    number = st.session_state.get("area_number", numbers[0])
+    if number not in numbers:
+        number = numbers[0]
+    return area_type, number
 
-    The API has no date parameters and always sends the whole history, so the
-    period is cut right after the download. The cache is per period, so moving
-    the slider to a new period gives a new download.
+
+@st.cache_data(ttl=3600)
+def download_reservoirs():
+    """Download the full weekly reservoir history from the NVE API.
+
+    The API has no date parameters and always sends the whole history. This function has no
+    arguments, so the download is cached once and not repeated when the period is changed.
     """
     response = requests.get(RESERVOIR_URL, timeout=60)
     response.raise_for_status()
@@ -55,12 +68,25 @@ def load_reservoirs(start_month, end_month):
     df = df.rename(columns=COLUMN_RENAME)
     df["date"] = pd.to_datetime(df["date"])
 
-    # Keep only the weeks inside the chosen period
-    months = df["date"].dt.strftime("%Y-%m")
-    df = df[(months >= start_month) & (months <= end_month)]
-
     # The raw rows are not sorted by date
     return df.sort_values("date")
+
+
+def load_reservoirs(start_month, end_month):
+    """Reservoir data for the months in the chosen period, cut from the cached download."""
+    df = download_reservoirs()
+    months = df["date"].dt.strftime("%Y-%m")
+    return df[(months >= start_month) & (months <= end_month)]
+
+
+@st.cache_data(ttl=86400, show_spinner="Downloading ERA5 data from open-meteo. This takes a minute or two the first time.")
+def load_weather(region, year):
+    """Hourly ERA5 weather for a region and year, averaged over the sampled locations.
+
+    The app uses 200 of the 1000 locations to keep the download at a minute or two
+    with open-meteo's free limits. The result is cached for each region and year.
+    """
+    return download_era5(region, f"{year}-01-01", f"{year}-12-31", n_points=200)
 
 
 @st.cache_resource
