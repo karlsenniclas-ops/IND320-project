@@ -6,3 +6,6 @@ __pycache__/
 # Secrets (MongoDB password, ENTSO-E token) stay local, on streamlit.io they go in the app settings
 .streamlit/secrets.toml
 .env
+
+# Local caches of downloaded weather data, the notebooks download them again if they are missing
+data/era5_*.csv

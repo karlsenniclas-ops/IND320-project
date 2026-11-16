@@ -32,7 +32,7 @@ months = month_options()
 DEFAULTS = {
     "area_type": "NO",
     "area_number": 0,
-    "period": (months[-24], months[-1]),
+    "period": (months[-60], months[-1]),
     "weather_property": "temperature_2m",
     "week": weeks()[-1],
 }

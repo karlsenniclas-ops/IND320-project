@@ -35,6 +35,7 @@ with tab_spc:
     n_std = st.slider("Number of standard deviations", min_value=1.0, max_value=6.0, value=3.0, step=0.5)
 
     fig, outliers, summary = spc_outliers(series, cutoff, n_std)
+    fig.update_layout(title=f"SPC outliers, {area_label}, {year}")
     st.plotly_chart(fig)
 
     # Summary of the outliers and the outlier hours
@@ -47,6 +48,7 @@ with tab_lof:
     contamination = st.slider("Proportion of outliers (%)", min_value=0.1, max_value=10.0, value=1.0, step=0.1) / 100
 
     fig, anomalies, summary = lof_anomalies(series, contamination)
+    fig.update_layout(title=f"LOF anomalies, {area_label}, {year}")
     st.plotly_chart(fig)
 
     # Summary of the anomalies and the anomaly hours
