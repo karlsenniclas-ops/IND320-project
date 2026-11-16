@@ -1,8 +1,11 @@
+import json
+
 import pandas as pd
 import pymongo
 import requests
 import streamlit as st
-from weather import download_era5
+from currency import download_exchange_rates
+from weather import download_daily, download_era5, to_weekly
 
 # NVE Magasinstatistikk API, returns the full weekly history for all areas
 RESERVOIR_URL = "https://biapi.nve.no/magasinstatistikk/api/Magasinstatistikk/HentOffentligData"
@@ -33,6 +36,14 @@ VALUE_COLUMNS = [
 
 # Area numbers that have data for each area type (VASS 4 is in the API, but has no data)
 AREA_NUMBERS = {"EL": [1, 2, 3, 4, 5], "NO": [0], "VASS": [1, 2, 3]}
+
+# Weather properties with the labels used in the app. The same names are used for hourly and weekly data
+WEATHER_PROPERTIES = {
+    "temperature_2m": "Temperature (°C)",
+    "precipitation": "Precipitation (mm)",
+    "snowfall": "Snowfall (cm)",
+    "wind_speed_10m": "Wind speed (m/s)",
+}
 
 
 def month_options():
@@ -72,6 +83,18 @@ def download_reservoirs():
     return df.sort_values("date")
 
 
+def weeks():
+    """All dates in the magasinstatistikk (the Sunday of each week), oldest first."""
+    return sorted(download_reservoirs()["date"].dt.date.unique())
+
+
+def weekly_filling(area_type, area_number):
+    """Weekly degree of filling in percent for one area, with the date (Sunday) as index."""
+    df = download_reservoirs()
+    df = df[(df["area_type"] == area_type) & (df["area_number"] == area_number)]
+    return (df.set_index("date")["fill_level"] * 100).asfreq("W-SUN")
+
+
 def load_reservoirs(start_month, end_month):
     """Reservoir data for the months in the chosen period, cut from the cached download."""
     df = download_reservoirs()
@@ -87,6 +110,31 @@ def load_weather(region, year):
     with open-meteo's free limits. The result is cached for each region and year.
     """
     return download_era5(region, f"{year}-01-01", f"{year}-12-31", n_points=200)
+
+
+@st.cache_data(ttl=86400, show_spinner="Downloading weather from open-meteo")
+def load_weekly_weather(region, start, end):
+    """Weekly ERA5 weather for a region between two dates (weeks ending on Sunday), from 10 of the sampled locations.
+
+    A week starts six days before its Sunday, and open-meteo does not accept dates after today.
+    """
+    first_day = pd.Timestamp(start) - pd.Timedelta(days=6)
+    last_day = min(pd.Timestamp(end), pd.Timestamp.today())
+    daily = download_daily(region, first_day.strftime("%Y-%m-%d"), last_day.strftime("%Y-%m-%d"))
+    return to_weekly(daily).loc[pd.Timestamp(start):last_day]
+
+
+@st.cache_data(ttl=86400, show_spinner="Downloading exchange rates from Norges Bank")
+def load_exchange_rates(first_year, last_year):
+    """Daily EUR and USD exchange rates (NOK) from Norges Bank, cached per range of years."""
+    return download_exchange_rates(f"{first_year}-01-01", f"{last_year}-12-31")
+
+
+@st.cache_data
+def load_geojson(name):
+    """Area outlines saved as GeoJSON by the part 4 notebook, e.g. "price_areas"."""
+    with open(f"data/geojson/{name}.geojson", encoding="utf-8") as f:
+        return json.load(f)
 
 
 @st.cache_resource

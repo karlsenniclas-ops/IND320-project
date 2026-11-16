@@ -31,7 +31,7 @@ with tab_stl:
     if len(series) < 2 * 52:
         st.warning("STL works best with at least two years of data. Choose a longer period in the sidebar.")
 
-    st.pyplot(stl_decomposition(series, seasonal=seasonal, trend=trend, robust=robust))
+    st.plotly_chart(stl_decomposition(series, seasonal=seasonal, trend=trend, robust=robust))
 
 with tab_spectrogram:
     window_length = st.slider("Window length (weeks)", min_value=13, max_value=260, value=52)
@@ -41,4 +41,4 @@ with tab_spectrogram:
     if window_length > len(series):
         st.warning("The window is longer than the data. Choose a shorter window or a longer period in the sidebar.")
     else:
-        st.pyplot(spectrogram_plot(series, window_length=window_length, window_overlap=window_overlap))
+        st.plotly_chart(spectrogram_plot(series, window_length=window_length, window_overlap=window_overlap))

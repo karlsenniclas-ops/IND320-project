@@ -1,4 +1,4 @@
-import matplotlib.pyplot as plt
+import plotly.express as px
 import streamlit as st
 from data import load_flows
 
@@ -18,20 +18,17 @@ with left:
     year = st.selectbox("Year", sorted(df["date"].dt.year.unique()))
 
     year_df = df[(df["connection"] == connection) & (df["date"].dt.year == year)]
-    totals = year_df.groupby("direction")["gwh"].sum()
+    totals = year_df.groupby("direction")["gwh"].sum().reset_index()
+    totals["direction"] = totals["direction"].map(DIRECTION_LABELS)
 
-    if totals.sum() == 0:
+    if totals["gwh"].sum() == 0:
         st.info("No flow data for this connection and year.")
     else:
         # Pie of the total amount in and out of Norway for the chosen connection and year
-        fig, ax = plt.subplots()
-        ax.pie(
-            totals,
-            labels=[f"{DIRECTION_LABELS[d]}\n{v:,.0f} GWh" for d, v in totals.items()],
-            autopct="%1.0f%%",
-        )
-        ax.set_title(f"{connection}, {year}")
-        st.pyplot(fig)
+        # color= makes Plotly express use the theme colours for the two directions
+        fig = px.pie(totals, names="direction", values="gwh", color="direction", title=f"{connection}, {year}")
+        fig.update_traces(texttemplate="%{value:,.0f} GWh<br>%{percent}")
+        st.plotly_chart(fig)
 
 with right:
     chosen_months = st.pills("Months", MONTHS, selection_mode="multi", default=["Jan"])
@@ -45,16 +42,13 @@ with right:
         # One column per direction. asfreq("D") adds empty days between months that are not chosen,
         # so the line has a gap there instead of a straight line across
         wide = month_df.pivot(index="date", columns="direction", values="gwh").asfreq("D")
+        wide = wide.rename(columns=DIRECTION_LABELS)
 
-        fig, ax = plt.subplots()
-        for direction in wide.columns:
-            ax.plot(wide.index, wide[direction], label=DIRECTION_LABELS[direction])
-        ax.set_xlabel("Date")
-        ax.set_ylabel("GWh per day")
-        ax.set_title(f"{connection}, {year}")
-        ax.legend()
-        fig.autofmt_xdate()
-        st.pyplot(fig)
+        fig = px.line(wide, title=f"{connection}, {year}")
+        fig.update_xaxes(title="Date")
+        fig.update_yaxes(title="GWh per day")
+        fig.update_layout(legend_title_text="Direction")
+        st.plotly_chart(fig)
 
 with st.expander("Data source"):
     st.write(

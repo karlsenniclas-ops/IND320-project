@@ -1,14 +1,16 @@
 import streamlit as st
 from analysis import lof_anomalies, spc_outliers
-from data import chosen_area, load_weather
+from data import WEATHER_PROPERTIES, chosen_area, load_weather
 from weather import region_id
 
 st.title("Outliers and Anomalies")
 
-# The weather data follows the area chosen in the sidebar, together with the reservoir pages
+# The area and the weather property come from the sidebar (or the map), shared with the other pages
 area_type, area_number = chosen_area()
 region = region_id(area_type, area_number)
 area_label = area_type if area_type == "NO" else f"{area_type} {area_number}"
+prop = st.session_state["weather_property"]
+label = WEATHER_PROPERTIES[prop]
 
 # The year is chosen here, since the weather data is downloaded for a whole year at a time
 years = list(range(2025, 1999, -1))
@@ -23,16 +25,19 @@ except Exception as error:
     st.error(f"Could not download weather data from open-meteo: {error}")
     st.stop()
 
+# The label with the unit is used as the name of the series in the plots
+series = weather[prop].rename(label)
+
 tab_spc, tab_lof = st.tabs(["Outliers (SPC)", "Anomalies (LOF)"])
 
 with tab_spc:
     cutoff = st.slider("Cut-off frequency (cycles per year)", min_value=1, max_value=100, value=12)
     n_std = st.slider("Number of standard deviations", min_value=1.0, max_value=6.0, value=3.0, step=0.5)
 
-    fig, outliers, summary = spc_outliers(weather["precipitation"], cutoff, n_std)
-    st.pyplot(fig)
+    fig, outliers, summary = spc_outliers(series, cutoff, n_std)
+    st.plotly_chart(fig)
 
-    # Summary of the outliers and the outlier hours (precipitation in mm)
+    # Summary of the outliers and the outlier hours
     st.dataframe(summary, hide_index=True)
     with st.expander("Outliers"):
         st.dataframe(outliers)
@@ -41,10 +46,10 @@ with tab_lof:
     # The proportion is chosen in percent
     contamination = st.slider("Proportion of outliers (%)", min_value=0.1, max_value=10.0, value=1.0, step=0.1) / 100
 
-    fig, anomalies, summary = lof_anomalies(weather["temperature_2m"], contamination)
-    st.pyplot(fig)
+    fig, anomalies, summary = lof_anomalies(series, contamination)
+    st.plotly_chart(fig)
 
-    # Summary of the anomalies and the anomaly hours (temperature in °C)
+    # Summary of the anomalies and the anomaly hours
     st.dataframe(summary, hide_index=True)
     with st.expander("Anomalies"):
         st.dataframe(anomalies)

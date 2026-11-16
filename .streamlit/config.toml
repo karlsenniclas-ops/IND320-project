@@ -1,0 +1,9 @@
+# Theme for the app: blue colours like water, used by the widgets and by the Plotly charts
+[theme]
+base = "light"
+primaryColor = "#1f6f8b"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#eaf2f5"
+textColor = "#1b2a34"
+font = "sans serif"
+chartCategoricalColors = ["#1f6f8b", "#e07a2f", "#4c9a5f", "#c44e52", "#8172b3", "#937860"]

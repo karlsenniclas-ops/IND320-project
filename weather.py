@@ -67,3 +67,69 @@ def download_era5(region, start, end, n_points=1000, points_file=POINTS_FILE):
     weather = total / cells["count"].sum()
     weather.index = pd.to_datetime(weather.index)
     return weather
+
+
+# Daily properties from open-meteo, renamed to the names of the hourly properties above
+DAILY_VARIABLES = {
+    "temperature_2m_mean": "temperature_2m",
+    "precipitation_sum": "precipitation",
+    "snowfall_sum": "snowfall",
+    "wind_speed_10m_mean": "wind_speed_10m",
+}
+
+
+def download_daily(region, start, end, n_points=10, points_file=POINTS_FILE):
+    """Daily ERA5 weather for a region, averaged over the first n_points sampled locations.
+
+    Same grid cell weighting as download_era5, but with daily values. timezone=Europe/Oslo gives
+    Norwegian days, so the days can be summed to the same weeks as in the magasinstatistikk.
+    """
+    points = pd.read_csv(points_file)
+    points = points[points["region"] == region].head(n_points)
+
+    # Round the locations to the nearest grid cell and count the locations in each cell
+    cells = (points[["lat", "lon"]] / 0.25).round() * 0.25
+    cells = cells.value_counts().reset_index()
+
+    params = {
+        "latitude": ",".join(cells["lat"].astype(str)),
+        "longitude": ",".join(cells["lon"].astype(str)),
+        "start_date": start,
+        "end_date": end,
+        "daily": ",".join(DAILY_VARIABLES),
+        "models": "era5",
+        "wind_speed_unit": "ms",
+        "timezone": "Europe/Oslo",
+    }
+    response = requests.get(ERA5_URL, params=params, timeout=120)
+    response.raise_for_status()
+    locations = response.json()
+    if isinstance(locations, dict):  # a single location is not returned as a list
+        locations = [locations]
+
+    # Add the daily values of each cell, weighted by the number of locations in the cell
+    total = 0
+    for location, count in zip(locations, cells["count"]):
+        daily = pd.DataFrame(location["daily"]).set_index("time")
+        total = total + daily * count
+
+    weather = total / cells["count"].sum()
+    weather.index = pd.to_datetime(weather.index)
+    return weather.rename(columns=DAILY_VARIABLES)
+
+
+def to_weekly(daily):
+    """Weekly weather for weeks ending on Sunday, like the dates in the magasinstatistikk.
+
+    Temperature and wind speed are averaged and precipitation and snowfall are summed.
+    Weeks that do not have values for all seven days (ERA5 is about 5 days behind) are left out.
+    """
+    daily = daily.dropna()
+    weekly = daily.resample("W-SUN").agg({
+        "temperature_2m": "mean",
+        "precipitation": "sum",
+        "snowfall": "sum",
+        "wind_speed_10m": "mean",
+    })
+    days = daily["temperature_2m"].resample("W-SUN").count()
+    return weekly[days == 7]
