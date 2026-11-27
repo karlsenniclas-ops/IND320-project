@@ -78,7 +78,7 @@ DAILY_VARIABLES = {
 }
 
 
-def download_daily(region, start, end, n_points=10, points_file=POINTS_FILE):
+def download_daily(region, start, end, n_points=1, points_file=POINTS_FILE):
     """Daily ERA5 weather for a region, averaged over the first n_points sampled locations.
 
     Same grid cell weighting as download_era5, but with daily values. timezone=Europe/Oslo gives

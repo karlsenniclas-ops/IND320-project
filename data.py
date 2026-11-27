@@ -114,13 +114,13 @@ def load_weather(region, year):
 
 @st.cache_data(ttl=86400, show_spinner="Downloading weather from open-meteo")
 def load_weekly_weather(region, start, end):
-    """Weekly ERA5 weather for a region between two dates (weeks ending on Sunday), from 10 of the sampled locations.
+    """Weekly ERA5 weather for a region between two dates (weeks ending on Sunday), from one sampled location.
 
     A week starts six days before its Sunday, and open-meteo does not accept dates after today.
     """
     first_day = pd.Timestamp(start) - pd.Timedelta(days=6)
     last_day = min(pd.Timestamp(end), pd.Timestamp.today())
-    daily = download_daily(region, first_day.strftime("%Y-%m-%d"), last_day.strftime("%Y-%m-%d"))
+    daily = download_daily(region, first_day.strftime("%Y-%m-%d"), last_day.strftime("%Y-%m-%d"), n_points=1)
     return to_weekly(daily).loc[pd.Timestamp(start):last_day]
 
 
