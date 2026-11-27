@@ -106,10 +106,10 @@ def load_reservoirs(start_month, end_month):
 def load_weather(region, year):
     """Hourly ERA5 weather for a region and year, averaged over the sampled locations.
 
-    The app uses 5 of the 1000 locations to reduce API usage. The result is cached
+    The app uses 1 of the 1000 locations to reduce API usage. The result is cached
     for each region and year.
     """
-    return download_era5(region, f"{year}-01-01", f"{year}-12-31", n_points=5)
+    return download_era5(region, f"{year}-01-01", f"{year}-12-31", n_points=1)
 
 
 @st.cache_data(ttl=86400, show_spinner="Downloading weather from open-meteo")

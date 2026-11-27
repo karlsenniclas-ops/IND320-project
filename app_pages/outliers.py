@@ -60,6 +60,6 @@ with st.expander("Data source"):
     st.write(
         "Hourly ERA5 reanalysis from open-meteo (UTC). 1000 locations were sampled at random inside each area "
         "from NVE's price area and region polygons. ERA5 has one value per 0.25 degree grid cell, so each cell is "
-        "downloaded once and weighted by the number of sampled locations in it. The app uses 5 of the 1000 "
+        "downloaded once and weighted by the number of sampled locations in it. The app uses 1 of the 1000 "
         "locations."
     )
