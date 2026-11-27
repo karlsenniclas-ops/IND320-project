@@ -102,14 +102,14 @@ def load_reservoirs(start_month, end_month):
     return df[(months >= start_month) & (months <= end_month)]
 
 
-@st.cache_data(ttl=86400, show_spinner="Downloading ERA5 data from open-meteo. This takes a minute or two the first time.")
+@st.cache_data(ttl=86400, show_spinner="Downloading ERA5 data from open-meteo")
 def load_weather(region, year):
     """Hourly ERA5 weather for a region and year, averaged over the sampled locations.
 
-    The app uses 200 of the 1000 locations to keep the download at a minute or two
-    with open-meteo's free limits. The result is cached for each region and year.
+    The app uses 5 of the 1000 locations to reduce API usage. The result is cached
+    for each region and year.
     """
-    return download_era5(region, f"{year}-01-01", f"{year}-12-31", n_points=200)
+    return download_era5(region, f"{year}-01-01", f"{year}-12-31", n_points=5)
 
 
 @st.cache_data(ttl=86400, show_spinner="Downloading weather from open-meteo")
